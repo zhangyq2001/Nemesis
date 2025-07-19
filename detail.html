@@ -4,11 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nitrogen-rich Energetic Materials Information Database (Nemesis)</title>
+    <title>Material Details - Nemesis</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+    <!-- 引入3DMol.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.1.0/3Dmol-min.js"></script>
     <style>
-        /* 3D 视图容器样式 */
         #viewer {
             width: 100%;
             height: 600px;
@@ -16,7 +17,6 @@
             position: relative;
         }
 
-        /* 加载消息样式 */
         #viewer-message {
             position: absolute;
             top: 50%;
@@ -27,300 +27,317 @@
             text-align: center;
         }
 
-        /* 动画效果 */
-        .animate-hover {
-            transition: all 0.3s ease;
+        .detail-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
         }
 
-        /* 表格字体大小 */
-        #data-table td {
-            font-size: 1.2rem;
-        }
-
-        .animate-hover:hover {
-            transform: scale(1.05);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        }
-
-        /* 作者信息样式 */
-        .author-info {
-            text-align: center;
-            font-size: 0.9rem;
+        .detail-label {
+            font-weight: bold;
             color: #4b5563;
+            margin-right: 10px;
+        }
+
+        .back-button {
+            margin-bottom: 20px;
+        }
+
+        /* 3D查看器控制按钮样式 */
+        .viewer-controls {
+            display: flex;
+            gap: 8px;
             margin-top: 10px;
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease;
+            flex-wrap: wrap;
         }
 
-        .author-info a {
-            color: #1d4ed8;
-            text-decoration: none;
-            transition: color 0.3s ease;
-        }
-
-        .author-info a:hover {
-            color: #1e3a8a;
-            text-decoration: underline;
-        }
-
-        /* 折叠按钮样式 */
-        .toggle-author-info {
-            background: none;
+        .viewer-controls button {
+            background-color: #3b82f6;
+            color: white;
             border: none;
-            color: #1d4ed8;
+            padding: 5px 10px;
+            border-radius: 4px;
             cursor: pointer;
-            font-size: 0.9rem;
-            text-decoration: underline;
-            transition: color 0.3s ease;
+            font-size: 14px;
+            transition: background-color 0.3s;
         }
 
-        .toggle-author-info:hover {
-            color: #1e3a8a;
+        .viewer-controls button:hover {
+            background-color: #2563eb;
         }
     </style>
 </head>
 
-<body class="bg-gray-100 font-sans relative">
+<body class="bg-gray-100 font-sans">
     <div class="container mx-auto p-8">
-        <h1 class="text-3xl font-bold text-center text-blue-500 mb-4">Nitrogen-rich Energetic Materials Information Database (Nemesis)</h1>
-        <div class="flex justify-center">
-            <button class="toggle-author-info" onclick="toggleAuthorInfo()">
-                <i class="fa-solid fa-info-circle mr-1"></i>
-                Show Author Information
-            </button>
-        </div>
-        <div class="author-info" id="authorInfo">
-            Developed by Laboratory of High Pressure Physics and Material Science, Qufu Normal University (Guanghui Zhang, Wencai Yi)<br>
-            Contact: <a href="mailto:yi.wencai@163.com">yi.wencai@163.com</a>
+        <button onclick="window.history.back()" class="back-button bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md">
+            <i class="fa-solid fa-arrow-left mr-2"></i> Back to List
+        </button>
+
+        <h1 class="text-3xl font-bold text-center text-blue-500 mb-8">Material Details</h1>
+
+        <div class="detail-card">
+            <h2 class="text-2xl font-semibold mb-4 text-center" id="detail-formula"></h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <p><span class="detail-label">ID:</span> <span id="detail-id"></span></p>
+                    <p><span class="detail-label">Mass Density:</span> <span id="detail-mass_density"></span> g/cm³</p>
+                    <p><span class="detail-label">N Concentration:</span> <span id="detail-N_concentration"></span>%</p>
+                </div>
+                <div>
+                    <p><span class="detail-label">E<sub>d</sub>:</span> <span id="detail-E_d"></span> kJ/g</p>
+                    <p><span class="detail-label">V<sub>d</sub>:</span> <span id="detail-V_d"></span> km/s</p>
+                    <p><span class="detail-label">P<sub>d</sub>:</span> <span id="detail-P_d"></span> GPa</p>
+                </div>
+            </div>
         </div>
 
-        <!-- Search Box -->
-        <div class="search-container max-w-2xl mx-auto mb-8">
-            <input type="text" id="search-box" placeholder="Search by chemical formula..." 
-                   oninput="renderTable()"
-                   class="w-full p-3 border border-blue-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-200 text-lg">
+        <div class="detail-card">
+            <h3 class="text-xl font-semibold mb-4">Crystal Structure</h3>
+            <div id="viewer">
+                <div id="viewer-message">3D Viewer Loading...</div>
+            </div>
+            <div class="viewer-controls">
+                <button onclick="rotateStructure('x')"><i class="fas fa-redo mr-1"></i> Rotate X</button>
+                <button onclick="rotateStructure('y')"><i class="fas fa-redo mr-1"></i> Rotate Y</button>
+                <button onclick="rotateStructure('z')"><i class="fas fa-redo mr-1"></i> Rotate Z</button>
+                <button onclick="zoomIn()"><i class="fas fa-search-plus mr-1"></i> Zoom In</button>
+                <button onclick="zoomOut()"><i class="fas fa-search-minus mr-1"></i> Zoom Out</button>
+                <button onclick="resetView()"><i class="fas fa-sync-alt mr-1"></i> Reset View</button>
+                <button onclick="toggleStyle()"><i class="fas fa-atom mr-1"></i> Toggle Style</button>
+                <button onclick="toggleLabels()"><i class="fas fa-tag mr-1"></i> Toggle Labels</button>
+            </div>
         </div>
 
-        <table id="data-table" class="w-full bg-white rounded-lg shadow-md overflow-hidden mb-8">
-            <thead class="bg-blue-500 text-white">
-                <tr>
-                    <th onclick="sortBy('id')" class="p-4 font-bold text-left cursor-pointer hover:bg-blue-600">ID</th>
-                    <th onclick="sortBy('formula')" class="p-4 font-bold text-left cursor-pointer hover:bg-blue-600">Formula</th>
-                    <th onclick="sortBy('mass_density')" class="p-4 font-bold text-left cursor-pointer hover:bg-blue-600">
-                        <span id="th-mass_density">Mass Density (g/cm<sup>3</sup>)</span>
-                    </th>
-                    <th onclick="sortBy('N_concentration')" class="p-4 font-bold text-left cursor-pointer hover:bg-blue-600">
-                        <span id="th-N_concentration">N Concentration (%)</span>
-                    </th>
-                    <th onclick="sortBy('E_d')" class="p-4 font-bold text-left cursor-pointer hover:bg-blue-600">
-                        <span id="th-E_d">E<sub>d</sub> (kJ/g)</span>
-                    </th>
-                    <th onclick="sortBy('V_d')" class="p-4 font-bold text-left cursor-pointer hover:bg-blue-600">
-                        <span id="th-V_d">V<sub>d</sub> (km/s)</span>
-                    </th>
-                    <th onclick="sortBy('P_d')" class="p-4 font-bold text-left cursor-pointer hover:bg-blue-600">
-                        <span id="th-P_d">P<sub>d</sub> (GPa)</span>
-                    </th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- Data will be inserted here -->
-            </tbody>
-        </table>
+        <div class="detail-card" id="cell-info">
+            <h3 class="text-xl font-semibold mb-4">Unit Cell Parameters</h3>
+            <div id="cell-parameters"></div>
+        </div>
 
-        <!-- Pagination Controls -->
-        <div class="pagination flex justify-center gap-4 mb-8">
-            <button onclick="changePage('prev')" id="prev-btn"
-                    class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md animate-hover">
-                <i class="fa-solid fa-arrow-left mr-2"></i> Previous
-            </button>
-            <span id="page-number" class="flex items-center font-medium text-blue-500"></span>
-            <button onclick="changePage('next')" id="next-btn"
-                    class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md animate-hover">
-                Next <i class="fa-solid fa-arrow-right ml-2"></i>
-            </button>
+        <div class="detail-card" id="positions-info">
+            <h3 class="text-xl font-semibold mb-4">Atomic Positions</h3>
+            <div id="atomic-positions"></div>
         </div>
     </div>
 
     <script>
-        function toSubscript(text) {
-            const subscriptMap = {
-                '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄',
-                '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉'
-            };
-            return text.replace(/\d/g, digit => subscriptMap[digit] || digit);
+        // 解析URL参数
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // 显示基本信息
+        document.getElementById('detail-id').textContent = urlParams.get('id');
+        document.getElementById('detail-formula').textContent = formatFormula(urlParams.get('formula'));
+        document.getElementById('detail-mass_density').textContent = formatValue(urlParams.get('mass_density'));
+        document.getElementById('detail-N_concentration').textContent = formatValue(urlParams.get('N_concentration'));
+        document.getElementById('detail-E_d').textContent = formatValue(urlParams.get('E_d'));
+        document.getElementById('detail-V_d').textContent = formatValue(urlParams.get('V_d'));
+        document.getElementById('detail-P_d').textContent = formatValue(urlParams.get('P_d'));
+
+        // 显示晶体结构信息
+        const cell = JSON.parse(urlParams.get('cell') || 'null');
+        const positions = JSON.parse(urlParams.get('positions') || 'null');
+
+        if (cell && cell !== 'N/A') {
+            document.getElementById('cell-parameters').innerHTML = `
+                <p><span class="detail-label">a:</span> ${formatValue(cell[0])} Å</p>
+                <p><span class="detail-label">b:</span> ${formatValue(cell[1])} Å</p>
+                <p><span class="detail-label">c:</span> ${formatValue(cell[2])} Å</p>
+                <p><span class="detail-label">α:</span> ${formatValue(cell[3])}°</p>
+                <p><span class="detail-label">β:</span> ${formatValue(cell[4])}°</p>
+                <p><span class="detail-label">γ:</span> ${formatValue(cell[5])}°</p>
+            `;
+        } else {
+            document.getElementById('cell-info').style.display = 'none';
         }
 
-        function formatNumber(value) {
-            if (value === undefined || value === null || isNaN(value)) {
+        if (positions && positions !== 'N/A') {
+            let positionsHTML = '<div class="overflow-x-auto"><table class="w-full border-collapse"><thead><tr class="bg-gray-100"><th class="p-2 border">Atom</th><th class="p-2 border">x</th><th class="p-2 border">y</th><th class="p-2 border">z</th></tr></thead><tbody>';
+            
+            positions.forEach(pos => {
+                positionsHTML += `<tr><td class="p-2 border">${pos.species}</td><td class="p-2 border">${formatValue(pos.x)}</td><td class="p-2 border">${formatValue(pos.y)}</td><td class="p-2 border">${formatValue(pos.z)}</td></tr>`;
+            });
+            
+            positionsHTML += '</tbody></table></div>';
+            document.getElementById('atomic-positions').innerHTML = positionsHTML;
+        } else {
+            document.getElementById('positions-info').style.display = 'none';
+        }
+
+        // 格式化函数
+        function formatValue(value) {
+            if (value === 'N/A' || value === null || value === undefined) {
                 return 'N/A';
             }
             return parseFloat(value).toFixed(3);
         }
 
-        let sortColumn = null;
-        let sortDirection = 'desc';
-        let data = {};
-        let currentPage = 1;
-        const rowsPerPage = 20;
-
-        // Fetch the JSON data
-        fetch('db.json')
-           .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-           .then(jsonData => {
-                data = jsonData;
-                console.log('Fetched data:', data); // 打印获取到的数据
-                renderTable();
-            })
-           .catch(error => {
-                console.error('Error loading JSON data:', error);
-                alert('Failed to load data. Please check the console for more details.');
-            });
-
-        function sortBy(column) {
-            if (sortColumn === column) {
-                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-            } else {
-                sortColumn = column;
-                sortDirection = 'desc';
-            }
-            renderTable();
+        function formatFormula(formula) {
+            const subscriptMap = {
+                '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄',
+                '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉'
+            };
+            return formula.replace(/\d/g, digit => subscriptMap[digit] || digit);
         }
 
-        // Render table with current page and search query
-        function renderTable() {
-            const tableBody = document.querySelector('#data-table tbody');
-            tableBody.innerHTML = '';
+        // 3D可视化相关变量
+        let viewer;
+        let currentStyle = 'sphere'; // 'sphere' 或 'stick'
+        let showLabels = true;
 
-            const searchQuery = document.getElementById('search-box').value.toLowerCase();
-            const filteredData = Object.entries(data).filter(([entryId, entry]) =>
-                entry.formula.toLowerCase().includes(searchQuery)
-            );
+        // 初始化3D查看器
+        function initViewer() {
+            if (!cell || !positions || cell === 'N/A' || positions === 'N/A') {
+                document.getElementById('viewer-message').textContent = 'No crystal structure data available';
+                return;
+            }
 
-            function updateSortArrows() {
-                const allHeaders = ['mass_density', 'N_concentration', 'E_d', 'V_d', 'P_d'];
-                allHeaders.forEach(header => {
-                    const thSpan = document.getElementById('th-' + header);
-                    if (thSpan) {
-                        thSpan.innerHTML = getColumnDisplayName(header) + 
-                            (sortColumn === header ? (sortDirection === 'asc' ? ' ↑' : ' ↓') : '');
-                    }
+            viewer = $3Dmol.createViewer("viewer", {
+                backgroundColor: 0xffffff
+            });
+            
+            // 移除加载消息
+            document.getElementById('viewer-message').style.display = 'none';
+            
+            // 创建原子数据
+            let atoms = [];
+            positions.forEach(pos => {
+                atoms.push({
+                    x: pos.x,
+                    y: pos.y,
+                    z: pos.z,
+                    elem: pos.species
+                });
+            });
+
+            // 创建晶胞
+            let box = {
+                a: cell[0],
+                b: cell[1],
+                c: cell[2],
+                alpha: cell[3],
+                beta: cell[4],
+                gamma: cell[5]
+            };
+
+            // 添加模型到查看器
+            let m = viewer.addModel();
+            m.addAtoms(atoms);
+            m.setUnitcell(box);
+            
+            // 设置初始样式
+            updateStyle();
+            
+            // 渲染
+            viewer.zoomTo();
+            viewer.render();
+        }
+
+        // 更新3D样式
+        function updateStyle() {
+            viewer.removeAllShapes();
+            
+            if (currentStyle === 'sphere') {
+                viewer.setStyle({}, {sphere: {radius: 0.5}});
+            } else {
+                viewer.setStyle({}, {stick: {radius: 0.15}});
+            }
+            
+            // 添加晶胞边界
+            viewer.addUnitCell('green', {box: true});
+            
+            // 更新标签
+            updateLabels();
+            
+            viewer.render();
+        }
+
+        // 更新原子标签
+        function updateLabels() {
+            viewer.removeAllLabels();
+            
+            if (showLabels) {
+                viewer.setStyle({}, {sphere: {hidden: true}});
+                viewer.setStyle({}, {stick: {hidden: true}});
+                
+                viewer.selectedAtoms({}).forEach(atom => {
+                    viewer.addLabel(atom.elem, {
+                        position: atom,
+                        fontSize: 12,
+                        fontColor: 'black',
+                        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                        borderThickness: 0.5,
+                        borderColor: 'rgba(0, 0, 0, 0.5)',
+                        inFront: true
+                    });
                 });
             }
-
-            function getColumnDisplayName(col) {
-                switch (col) {
-                    case 'mass_density': return 'Mass Density (g/cm³)';
-                    case 'N_concentration': return 'N Concentration (%)';
-                    case 'E_d': return 'E<sub>d</sub> (kJ/g)';
-                    case 'V_d': return 'V<sub>d</sub> (km/s)';
-                    case 'P_d': return 'P<sub>d</sub> (GPa)';
-                    default: return col;
-                }
-            }
-
-            if (sortColumn) {
-                filteredData.sort((a, b) => {
-                    let aVal = sortColumn === 'id' ? parseInt(a[0]) : a[1][sortColumn];
-                    let bVal = sortColumn === 'id' ? parseInt(b[0]) : b[1][sortColumn];
-
-                    aVal = (aVal === undefined || aVal === null) ? -Infinity : aVal;
-                    bVal = (bVal === undefined || bVal === null) ? -Infinity : bVal;
-
-                    if (typeof aVal === 'number' && typeof bVal === 'number') {
-                        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
-                    } else {
-                        return sortDirection === 'asc' ?
-                            String(aVal).localeCompare(String(bVal)) :
-                            String(bVal).localeCompare(String(aVal));
-                    }
-                });
-            }
-
-            const startIndex = (currentPage - 1) * rowsPerPage;
-            const endIndex = currentPage * rowsPerPage;
-            const paginatedData = filteredData.slice(startIndex, endIndex);
-
-            paginatedData.forEach(([entryId, entry]) => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td class="p-4 border-b border-gray-200">${entryId}</td>
-                    <td class="p-4 border-b border-gray-200">${toSubscript(entry.formula)}</td>
-                    <td class="p-4 border-b border-gray-200">${formatNumber(entry.mass_density)}</td>
-                    <td class="p-4 border-b border-gray-200">${formatNumber(entry.N_concentration)}</td>
-                    <td class="p-4 border-b border-gray-200">${formatNumber(entry.E_d)}</td>
-                    <td class="p-4 border-b border-gray-200">${formatNumber(entry.V_d)}</td>
-                    <td class="p-4 border-b border-gray-200">${formatNumber(entry.P_d)}</td>
-                `;
-                row.addEventListener('click', () => showDetailsInNewPage(entryId));
-                tableBody.appendChild(row);
-            });
-
-            updatePagination(filteredData.length);
-            updateSortArrows();
-        }
-
-        function changePage(direction) {
-            const totalRows = Object.keys(data).length;
-            const totalPages = Math.ceil(totalRows / rowsPerPage);
-
-            if (direction === 'prev' && currentPage > 1) {
-                currentPage--;
-            } else if (direction === 'next' && currentPage < totalPages) {
-                currentPage++;
-            }
-            renderTable();
-        }
-
-        function updatePagination(totalRows) {
-            const totalPages = Math.ceil(totalRows / rowsPerPage);
-            document.getElementById('page-number').textContent = 
-                `Page ${currentPage} of ${totalPages}`;
-        }
-
-        function showDetailsInNewPage(entryId) {
-            const entry = data[entryId];
-            const queryParams = new URLSearchParams({
-                id: entryId,
-                formula: entry.formula,
-                mass_density: entry.mass_density || 'N/A',
-                N_concentration: entry.N_concentration || 'N/A',
-                E_d: entry.E_d || 'N/A',
-                V_d: entry.V_d || 'N/A',
-                P_d: entry.P_d || 'N/A',
-                positions: JSON.stringify(entry.positions || 'N/A'),
-                cell: JSON.stringify(entry.cell || 'N/A')
-            });
-            window.open(`detail.html?${queryParams.toString()}`, '_blank');
-        }
-        
-        function updateSortArrows() {
-            document.querySelectorAll('th').forEach(header => {
-                header.removeAttribute('data-sort-direction');
-                if (header.textContent.includes(sortColumn)) {
-                    header.setAttribute('data-sort-direction', sortDirection);
-                }
-            });
-        }
-
-        function toggleAuthorInfo() {
-            const authorInfo = document.getElementById('authorInfo');
-            const button = document.querySelector('.toggle-author-info');
-            if (authorInfo.style.maxHeight === '0px' || authorInfo.style.maxHeight === '') {
-                authorInfo.style.maxHeight = authorInfo.scrollHeight + 'px';
-                button.innerHTML = '<i class="fa-solid fa-info-circle mr-1"></i> Hide Author Information';
+            
+            // 重新应用样式
+            if (currentStyle === 'sphere') {
+                viewer.setStyle({}, {sphere: {radius: 0.5}});
             } else {
-                authorInfo.style.maxHeight = '0px';
-                button.innerHTML = '<i class="fa-solid fa-info-circle mr-1"></i> Show Author Information';
+                viewer.setStyle({}, {stick: {radius: 0.15}});
+            }
+            
+            viewer.render();
+        }
+
+        // 控制函数
+        function rotateStructure(axis) {
+            if (!viewer) return;
+            
+            let angle = Math.PI / 4; // 45度
+            switch (axis) {
+                case 'x':
+                    viewer.rotate(angle, 0, 0);
+                    break;
+                case 'y':
+                    viewer.rotate(0, angle, 0);
+                    break;
+                case 'z':
+                    viewer.rotate(0, 0, angle);
+                    break;
+            }
+            viewer.render();
+        }
+
+        function zoomIn() {
+            if (viewer) {
+                viewer.zoom(1.2);
+                viewer.render();
             }
         }
+
+        function zoomOut() {
+            if (viewer) {
+                viewer.zoom(0.8);
+                viewer.render();
+            }
+        }
+
+        function resetView() {
+            if (viewer) {
+                viewer.zoomTo();
+                viewer.rotate(0, 0, 0);
+                viewer.render();
+            }
+        }
+
+        function toggleStyle() {
+            currentStyle = currentStyle === 'sphere' ? 'stick' : 'sphere';
+            updateStyle();
+        }
+
+        function toggleLabels() {
+            showLabels = !showLabels;
+            updateLabels();
+        }
+
+        // 页面加载完成后初始化查看器
+        window.addEventListener('DOMContentLoaded', initViewer);
     </script>
 </body>
-
 </html>
